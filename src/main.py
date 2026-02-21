@@ -2,12 +2,24 @@ import sqlite3
 from datetime import datetime
 
 def connect_db():
-    # Connessione al database e attivazione dei vincoli di chiave esterna
+    """
+    Crea la connessione con il database SQLite ed attiva il supporto alle chiavi esterne.
+    
+    Returns:
+        sqlite3.Connection: connessione al database 'spese_personali.db'.
+    """
+    # Connessione al database e attivazione dei vincoli  chiave esterna
     conn = sqlite3.connect('spese_personali.db')
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 def menu_principale():
+    """
+    Visualizza il menù principale chiedendo la scelta all'utente.
+    
+    Returns:
+        str: La stringa digitata dall'utente corrispondente all'opzione scelta.
+    """
     print("\n----------------------------------")
     print("     SISTEMA SPESE PERSONALI      ")
     print("----------------------------------")
@@ -21,6 +33,12 @@ def menu_principale():
 
 # MODULO 1: Gestione Categorie
 def gestione_categorie(conn):
+    """
+    Gestisce l'inserimento di una nuova categoria di spesa.
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     nome = input("Nome della categoria: ").strip()
     if not nome:
         print("Errore: Il nome non può essere vuoto.")
@@ -36,6 +54,12 @@ def gestione_categorie(conn):
 
 # MODULO 2: Inserimento di una Spesa
 def inserisci_spesa(conn):
+    """
+    Acquisisce i dettagli di una spesa (data, importo, categoria, descrizione) e la registra nel DB.
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     data = input("Data (YYYY-MM-DD): ")
     try:
         importo = float(input("Importo: "))
@@ -66,6 +90,13 @@ def inserisci_spesa(conn):
 
 # MODULO 3: Definizione del Budget Mensile
 def definisci_budget(conn):
+    """
+    Imposta il limite di spesa mensile per una categoria specifica. 
+    Se il budget esiste già, lo aggiorna (con ON CONFLICT).
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     mese = input("Mese (YYYY-MM): ")
     nome_cat = input("Nome della categoria: ")
     try:
@@ -97,6 +128,12 @@ def definisci_budget(conn):
 
 # MODULO 4: Visualizzazione dei Report
 def visualizza_report(conn):
+    """
+    Gestisce il sottomenu dei report per visualizzare statistiche su spese e budget.
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     print("\n--- MENU REPORT ---")
     print("1. Totale spese per categoria")
     print("2. Spese mensili vs budget")
@@ -152,6 +189,12 @@ def visualizza_report(conn):
 
 # FUNZIONE DI SUPPORTO: Dati di esempio per la dimostrazione
 def popola_dati_esempio(conn):
+    """
+    Inserisce dati fittizi nel database, per permettere una dimostrazione immediata dei report.
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     cursor = conn.cursor()
     # Inserimento Categorie
     categorie = [('Alimentari',), ('Trasporti',), ('Svago',)]
@@ -171,6 +214,10 @@ def popola_dati_esempio(conn):
     conn.commit()
 
 def main():
+    """
+    Entry point principale dell'applicazione. Inizializza il database,
+    carica i dati di test e avvia il ciclo interattivo del menu.
+    """
     print("Avvio del Sistema Gestionale Spese...")
     conn = connect_db()
     
