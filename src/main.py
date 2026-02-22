@@ -141,38 +141,100 @@ def definisci_budget(conn):
         print("Errore categoria.")
 
 def visualizza_report(conn):
-    """Gestisce i report e genera automaticamente i file PDF in src/pdf."""
-    print("\n--- MENU REPORT ---")
-    print("1. Totale spese per categoria (PDF: report1.pdf)")
-    print("2. Spese mensili vs budget (PDF: report2.pdf)")
-    print("3. Elenco completo spese (PDF: report3.pdf)")
-    scelta_rep = input("Inserisci scelta: ")
-    cursor = conn.cursor()
+    """
+    Gestisce il sotto-menù della reportistica.
+    Visualizza i dati formattati in console e genera contemporaneamente i file PDF.
+    Resta all'interno di questo menù finché l'utente non sceglie di uscire con l'opzione 4.
 
-    match scelta_rep:
-        case "1":
-            cursor.execute("SELECT c.nome, SUM(s.importo) FROM Spese s JOIN Categorie c ON s.categoria_id = c.id GROUP BY c.nome")
-            risultati = cursor.fetchall()
-            dati_pdf = [(r[0], f"{r[1]:.2f}") for r in risultati]
-            genera_pdf("report1.pdf", "Totale Spese per Categoria", ["Categoria", "Totale (€)"], dati_pdf)
+    Args:
+        conn (sqlite3.Connection): Connessione attiva al database.
+    """
+    while True:
+        print("\n--- MENU REPORT ---")
+        print("1. Totale spese per categoria (Console + PDF: report1.pdf)")
+        print("2. Spese mensili vs budget (Console + PDF: report2.pdf)")
+        print("3. Elenco completo spese (Console + PDF: report3.pdf)")
+        print("4. Ritorna al menu principale")
         
-        case "2":
-            mese = input("Inserisci mese (YYYY-MM): ")
-            cursor.execute("""
-                SELECT c.nome, b.importo_limite, IFNULL(SUM(s.importo), 0)
-                FROM Budget b JOIN Categorie c ON b.categoria_id = c.id
-                LEFT JOIN Spese s ON c.id = s.categoria_id AND strftime('%Y-%m', s.data) = b.mese
-                WHERE b.mese = ? GROUP BY c.nome
-            """, (mese,))
-            risultati = cursor.fetchall()
-            dati_pdf = [(r[0], f"{r[1]:.2f}", f"{r[2]:.2f}", "OK" if r[2] <= r[1] else "OVER") for r in risultati]
-            genera_pdf("report2.pdf", f"Analisi Budget Mese: {mese}", ["Categoria", "Budget", "Speso", "Stato"], dati_pdf)
+        scelta_rep = input("Inserisci scelta: ")
+        cursor = conn.cursor()
 
-        case "3":
-            cursor.execute("SELECT s.data, c.nome, s.importo, s.descrizione FROM Spese s JOIN Categorie c ON s.categoria_id = c.id ORDER BY s.data")
-            risultati = cursor.fetchall()
-            dati_pdf = [(r[0], r[1], f"{r[2]:.2f}", r[3]) for r in risultati]
-            genera_pdf("report3.pdf", "Elenco Completo Spese", ["Data", "Categoria", "Importo", "Note"], dati_pdf)
+        match scelta_rep:
+            case "1":
+                cursor.execute("""
+                    SELECT c.nome, SUM(s.importo) 
+                    FROM Spese s 
+                    JOIN Categorie c ON s.categoria_id = c.id 
+                    GROUP BY c.nome
+                """)
+                risultati = cursor.fetchall()
+                if risultati:
+                    # Visualizzazione a video
+                    print(f"\n{'CATEGORIA':<20} | {'TOTALE SPESO':<12}")
+                    print("-" * 35)
+                    for r in risultati:
+                        print(f"{r[0]:<20} | € {r[1]:>10.2f}")
+                    
+                    # Generazione PDF
+                    dati_pdf = [(r[0], f"{r[1]:.2f}") for r in risultati]
+                    genera_pdf("report1.pdf", "Totale Spese per Categoria", ["Categoria", "Totale (€)"], dati_pdf)
+                else:
+                    print("Nessun dato disponibile.")
+            
+            case "2":
+                mese = input("Inserisci mese (YYYY-MM): ")
+                cursor.execute("""
+                    SELECT c.nome, b.importo_limite, IFNULL(SUM(s.importo), 0)
+                    FROM Budget b 
+                    JOIN Categorie c ON b.categoria_id = c.id
+                    LEFT JOIN Spese s ON c.id = s.categoria_id AND strftime('%Y-%m', s.data) = b.mese
+                    WHERE b.mese = ? 
+                    GROUP BY c.nome
+                """, (mese,))
+                risultati = cursor.fetchall()
+                if risultati:
+                    # Visualizzazione a video
+                    print(f"\n{'CATEGORIA':<15} | {'BUDGET':<10} | {'SPESO':<10} | {'STATO'}")
+                    print("-" * 55)
+                    for r in risultati:
+                        stato = "OK" if r[2] <= r[1] else "!! OVER !!"
+                        print(f"{r[0]:<15} | € {r[1]:>8.2f} | € {r[2]:>8.2f} | {stato}")
+                    
+                    # Generazione PDF
+                    dati_pdf = [(r[0], f"{r[1]:.2f}", f"{r[2]:.2f}", "OK" if r[2] <= r[1] else "OVER") for r in risultati]
+                    genera_pdf("report2.pdf", f"Analisi Budget Mese: {mese}", ["Categoria", "Budget", "Speso", "Stato"], dati_pdf)
+                else:
+                    print(f"Nessun budget definito per il mese {mese}.")
+
+            case "3":
+                cursor.execute("""
+                    SELECT s.data, c.nome, s.importo, s.descrizione 
+                    FROM Spese s 
+                    JOIN Categorie c ON s.categoria_id = c.id 
+                    ORDER BY s.data ASC
+                """)
+                risultati = cursor.fetchall()
+                if risultati:
+                    # Visualizzazione a video
+                    print(f"\n{'DATA':<12} | {'CATEGORIA':<15} | {'IMPORTO':<10} | {'DESCRIZIONE'}")
+                    print("-" * 65)
+                    for r in risultati:
+                        desc = r[3] if r[3] else "-"
+                        print(f"{r[0]:<12} | {r[1]:<15} | € {r[2]:>8.2f} | {desc}")
+                    
+                    # Generazione PDF
+                    dati_pdf = [(r[0], r[1], f"{r[2]:.2f}", r[3]) for r in risultati]
+                    genera_pdf("report3.pdf", "Elenco Completo Spese", ["Data", "Categoria", "Importo", "Note"], dati_pdf)
+                else:
+                    print("Nessuna spesa registrata.")
+
+            case "4":
+                print("Ritorno al menù principale...")
+                break
+            
+            case _:
+                print("Scelta non valida. Riprovare.")
+
 
 def popola_dati_esempio(conn):
     """Dati demo per la presentazione."""
@@ -192,7 +254,7 @@ def main():
         print("Errore caricamento SQL.")
     
     while True:
-        scelta = menu_principal()
+        scelta = menu_principale()
         match scelta:
             case "1": gestione_categorie(conn)
             case "2": inserisci_spesa(conn)
