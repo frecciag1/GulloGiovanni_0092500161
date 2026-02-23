@@ -20,6 +20,9 @@ def connect_db():
 def assicura_cartella_pdf():
     """
     Verifica l'esistenza della cartella src/pdf e la crea se non esiste.
+    
+    Returns:
+        str: Il percorso della cartella PDF.
     """
     percorso = os.path.join("src", "pdf")
     if not os.path.exists(percorso):
@@ -28,7 +31,7 @@ def assicura_cartella_pdf():
 
 def genera_pdf(nome_file, titolo, intestazioni, dati):
     """
-    Funzione di utilità per creare un file PDF ben formattato.
+    Funzione di utilità per creare un file PDF ben formattato con tabelle.
     
     Args:
         nome_file (str): Nome del file (es. report1.pdf).
@@ -51,7 +54,7 @@ def genera_pdf(nome_file, titolo, intestazioni, dati):
     tabella_dati = [intestazioni] + dati
     t = Table(tabella_dati)
     
-    # Stile Tabella
+    # Stile Tabella professionale
     stile_tabella = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -67,8 +70,20 @@ def genera_pdf(nome_file, titolo, intestazioni, dati):
     doc.build(elementi)
     print(f"File PDF creato con successo: {percorso_completo}")
 
+def pulisci_schermo():
+    """
+    Pulisce la console dai messaggi precedenti.
+    Funziona sia su Windows ('cls') che su Linux/macOS ('clear').
+    """
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 def menu_principale():
-    """Visualizza il menu principale e acquisisce la scelta."""
+    """
+    Visualizza il menu principale del sistema.
+    
+    Returns:
+        str: La scelta inserita dall'utente.
+    """
     print("\n----------------------------------")
     print("     SISTEMA SPESE PERSONALI      ")
     print("----------------------------------")
@@ -81,7 +96,7 @@ def menu_principale():
     return input("Inserisci la tua scelta: ")
 
 def gestione_categorie(conn):
-    """Gestisce l'inserimento di una nuova categoria."""
+    """Gestisce l'inserimento di una nuova categoria nel database."""
     nome = input("Nome della categoria: ").strip()
     if not nome:
         print("Errore: Il nome non può essere vuoto.")
@@ -95,7 +110,7 @@ def gestione_categorie(conn):
         print("Errore: La categoria esiste già.")
 
 def inserisci_spesa(conn):
-    """Registra una nuova spesa nel DB."""
+    """Registra una nuova spesa collegandola a una categoria esistente."""
     data = input("Data (YYYY-MM-DD): ")
     try:
         importo = float(input("Importo: "))
@@ -119,7 +134,7 @@ def inserisci_spesa(conn):
         print("Errore: la categoria non esiste.")
 
 def definisci_budget(conn):
-    """Imposta o aggiorna il budget mensile per una categoria."""
+    """Imposta o aggiorna il budget mensile per una categoria specifica."""
     mese = input("Mese (YYYY-MM): ")
     nome_cat = input("Nome della categoria: ")
     try:
@@ -136,18 +151,15 @@ def definisci_budget(conn):
             ON CONFLICT(mese, categoria_id) DO UPDATE SET importo_limite=excluded.importo_limite
         """, (mese, res[0], importo))
         conn.commit()
-        print("Budget salvato.")
+        print("Budget salvato correttamente.")
     else:
-        print("Errore categoria.")
+        print("Errore: categoria non trovata.")
 
 def visualizza_report(conn):
     """
     Gestisce il sotto-menù della reportistica.
     Visualizza i dati formattati in console e genera contemporaneamente i file PDF.
-    Resta all'interno di questo menù finché l'utente non sceglie di uscire con l'opzione 4.
-
-    Args:
-        conn (sqlite3.Connection): Connessione attiva al database.
+    Resta all'interno di questo menù finché l'utente non sceglie di uscire.
     """
     while True:
         print("\n--- MENU REPORT ---")
@@ -169,13 +181,11 @@ def visualizza_report(conn):
                 """)
                 risultati = cursor.fetchall()
                 if risultati:
-                    # Visualizzazione a video
                     print(f"\n{'CATEGORIA':<20} | {'TOTALE SPESO':<12}")
                     print("-" * 35)
                     for r in risultati:
                         print(f"{r[0]:<20} | € {r[1]:>10.2f}")
                     
-                    # Generazione PDF
                     dati_pdf = [(r[0], f"{r[1]:.2f}") for r in risultati]
                     genera_pdf("report1.pdf", "Totale Spese per Categoria", ["Categoria", "Totale (€)"], dati_pdf)
                 else:
@@ -193,14 +203,12 @@ def visualizza_report(conn):
                 """, (mese,))
                 risultati = cursor.fetchall()
                 if risultati:
-                    # Visualizzazione a video
                     print(f"\n{'CATEGORIA':<15} | {'BUDGET':<10} | {'SPESO':<10} | {'STATO'}")
                     print("-" * 55)
                     for r in risultati:
                         stato = "OK" if r[2] <= r[1] else "!! OVER !!"
                         print(f"{r[0]:<15} | € {r[1]:>8.2f} | € {r[2]:>8.2f} | {stato}")
                     
-                    # Generazione PDF
                     dati_pdf = [(r[0], f"{r[1]:.2f}", f"{r[2]:.2f}", "OK" if r[2] <= r[1] else "OVER") for r in risultati]
                     genera_pdf("report2.pdf", f"Analisi Budget Mese: {mese}", ["Categoria", "Budget", "Speso", "Stato"], dati_pdf)
                 else:
@@ -215,14 +223,12 @@ def visualizza_report(conn):
                 """)
                 risultati = cursor.fetchall()
                 if risultati:
-                    # Visualizzazione a video
                     print(f"\n{'DATA':<12} | {'CATEGORIA':<15} | {'IMPORTO':<10} | {'DESCRIZIONE'}")
                     print("-" * 65)
                     for r in risultati:
                         desc = r[3] if r[3] else "-"
                         print(f"{r[0]:<12} | {r[1]:<15} | € {r[2]:>8.2f} | {desc}")
                     
-                    # Generazione PDF
                     dati_pdf = [(r[0], r[1], f"{r[2]:.2f}", r[3]) for r in risultati]
                     genera_pdf("report3.pdf", "Elenco Completo Spese", ["Data", "Categoria", "Importo", "Note"], dati_pdf)
                 else:
@@ -233,34 +239,73 @@ def visualizza_report(conn):
                 break
             
             case _:
-                print("Scelta non valida. Riprovare.")
-
+                print("Attenzione!!!! scelta errata")
 
 def popola_dati_esempio(conn):
-    """Dati demo per la presentazione."""
+    """Inserisce dati di test (Categorie, Budget e Spese) per la demo."""
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO Categorie (nome) VALUES ('Alimentari')")
-    cursor.execute("INSERT OR IGNORE INTO Categorie (nome) VALUES ('Trasporti')")
+    mese_corrente = datetime.now().strftime('%Y-%m')
+    
+    # Inserimento Categorie
+    categorie = [('Alimentari',), ('Trasporti',), ('Svago',)]
+    cursor.executemany("INSERT OR IGNORE INTO Categorie (nome) VALUES (?)", categorie)
+    conn.commit()
+
+    # Recupero ID per associazioni
+    cursor.execute("SELECT id, nome FROM Categorie")
+    cat_dict = {nome: id for id, nome in cursor.fetchall()}
+
+    # Inserimento Budget per il mese corrente
+    budget_data = [
+        (mese_corrente, cat_dict['Alimentari'], 200.00),
+        (mese_corrente, cat_dict['Trasporti'], 50.00)
+    ]
+    cursor.executemany("""
+        INSERT OR IGNORE INTO Budget (mese, categoria_id, importo_limite) 
+        VALUES (?, ?, ?)""", budget_data)
+
+    # Inserimento Spese (una in budget, una che supera il budget)
+    spese_data = [
+        (datetime.now().strftime('%Y-%m-%d'), 150.00, cat_dict['Alimentari'], 'Spesa Settimanale'),
+        (datetime.now().strftime('%Y-%m-%d'), 75.00, cat_dict['Trasporti'], 'Rifornimento Benzina') # Supera i 50€
+    ]
+    cursor.executemany("""
+        INSERT OR IGNORE INTO Spese (data, importo, categoria_id, descrizione) 
+        VALUES (?, ?, ?, ?)""", spese_data)
+    
     conn.commit()
 
 def main():
-    """Main entry point."""
+    """Punto di ingresso principale dell'applicazione."""
     conn = connect_db()
     try:
+        # Caricamento schema database da file esterno
         with open('sql/database.sql', 'r') as f:
             conn.executescript(f.read())
         popola_dati_esempio(conn)
     except FileNotFoundError:
-        print("Errore caricamento SQL.")
+        print("Errore fatale: File sql/database.sql non trovato.")
+        return
     
     while True:
+        pulisci_schermo()
         scelta = menu_principale()
         match scelta:
-            case "1": gestione_categorie(conn)
-            case "2": inserisci_spesa(conn)
-            case "3": definisci_budget(conn)
-            case "4": visualizza_report(conn)
-            case "5": break
+            case "1":
+                gestione_categorie(conn)
+            case "2":
+                inserisci_spesa(conn)
+            case "3":
+                definisci_budget(conn)
+            case "4":
+                visualizza_report(conn)
+            case "5":
+                print("Chiusura del sistema. Arrivederci!")
+                break
+            case _:
+                print("Attenzione!!!! scelta errata")
+        if scelta != "5":
+            input("\nPremere Invio per continuare...")
     conn.close()
 
 if __name__ == "__main__":
