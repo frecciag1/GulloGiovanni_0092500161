@@ -1,34 +1,30 @@
 # Sistema Gestionale Spese Personali
 
-Il progetto implementato è un applicativo Python per la gestione delle spese personali, sviluppato come elaborato per il corso di Fondamenti di informatica. 
-Il sistema permette di gestire categorie, registrare spese, impostare budget mensili e visualizzare report dettagliati, utilizzando SQLite per la persistenza dei dati.
+Il progetto è stato sviluppato nell'ambito del corso di Fondamenti di informatica, si tratta di un applicativo Python, per la gestione delle spese personali. Il sistema permette di gestire categorie, registrare movimenti, impostare budget mensili e generare report professionali sia a video (come richiesto) che in formato PDF.
+I PDF verranno creati in automatico all'interno della cartella src/pdf dopo l'esecuzione dei comandi per i report.
 
 ## 1. Requisiti per l’esecuzione
 
 ### Compilatore o interprete necessario
-* **Python 3.10 o superiore**: È necessario l'interprete Python in una versione recente (3.10+) per supportare il costrutto `match-case` (lo switch di Python) utilizzato nel codice.
+* **Python 3.10 o superiore**: È richiesto per il supporto al costrutto `match-case`.
 
-### Eventuali librerie standard utilizzate
-Il programma utilizza esclusivamente librerie standard di Python, pertanto non è necessaria l'installazione di pacchetti esterni tramite `pip`.
-* `sqlite3`: Per la gestione del database relazionale.
-* `datetime`: Per la gestione e la formattazione delle date.
-* `os`: Per la gestione dei percorsi dei file di sistema.
+### Librerie utilizzate
+Il programma utilizza alcune librerie standard e una libreria esterna per la generazione dei PDF:
+1. **Librerie Standard (incluse in Python)**:
+   - `sqlite3`: Per la gestione del database relazionale.
+   - `datetime`, `os`: Per la gestione di date e file di sistema.
+2. **Libreria Esterna (da installare)**:
+   - `reportlab`: Necessaria per la creazione dei file PDF professionali.
 
 ---
 
-## 2. Istruzioni dettagliate per eseguire il programma
+## 2. Installazione e Preparazione
 
-### Istruzioni di compilazione
-Essendo un linguaggio interpretato, **Python non richiede una fase di compilazione** preventiva. Il codice sorgente viene eseguito direttamente dall'interprete.
+Per eseguire correttamente il programma, occorre aprire il terminale e seguire questi passaggi:
 
-### Istruzioni di avvio del programma
-1. Assicurarsi che la struttura delle cartelle sia la seguente:
-   - `main.py` (nella cartella `src/` o nella root)
-   - `sql/database.sql` (contiene lo script di creazione delle tabelle)
-2. Aprire il terminale o il prompt dei comandi nella cartella principale del progetto.
+1. **Installazione della libreria per i PDF**:
+   ```bash
+   pip install reportlab
 
-### Comando esatto da eseguire
-Dalla cartella principale, eseguire il seguente comando:
-
-```bash
-python src/main.py
+Avvio del programma:
+   python src/main.py
