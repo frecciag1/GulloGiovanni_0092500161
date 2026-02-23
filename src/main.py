@@ -1,88 +1,24 @@
 import sqlite3
-import os
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
 
 def connect_db():
     """
-    Stabilisce la connessione con il database SQLite e attiva il supporto alle chiavi esterne.
+    Crea la connessione con il database SQLite ed attiva il supporto alle chiavi esterne.
     
     Returns:
-        sqlite3.Connection: Oggetto di connessione al database 'spese_personali.db'.
+        sqlite3.Connection: connessione al database 'spese_personali.db'.
     """
+    # Connessione al database e attivazione dei vincoli  chiave esterna
     conn = sqlite3.connect('spese_personali.db')
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-def assicura_cartella_pdf():
-    """
-    Verifica l'esistenza della cartella src/pdf e la crea se non esiste.
-    
-    Returns:
-        str: Il percorso della cartella PDF.
-    """
-    percorso = os.path.join("src", "pdf")
-    if not os.path.exists(percorso):
-        os.makedirs(percorso)
-    return percorso
-
-def genera_pdf(nome_file, titolo, intestazioni, dati):
-    """
-    Funzione di utilità per creare un file PDF ben formattato con tabelle.
-    
-    Args:
-        nome_file (str): Nome del file (es. report1.pdf).
-        titolo (str): Titolo del report all'interno del documento.
-        intestazioni (list): Lista delle intestazioni della tabella.
-        dati (list): Lista di tuple contenenti i record del database.
-    """
-    cartella = assicura_cartella_pdf()
-    percorso_completo = os.path.join(cartella, nome_file)
-    
-    doc = SimpleDocTemplate(percorso_completo, pagesize=letter)
-    elementi = []
-    stili = getSampleStyleSheet()
-    
-    # Aggiunta Titolo
-    elementi.append(Paragraph(titolo, stili['Title']))
-    elementi.append(Spacer(1, 12))
-    
-    # Preparazione Tabella
-    tabella_dati = [intestazioni] + dati
-    t = Table(tabella_dati)
-    
-    # Stile Tabella professionale
-    stile_tabella = TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ])
-    t.setStyle(stile_tabella)
-    
-    elementi.append(t)
-    doc.build(elementi)
-    print(f"File PDF creato con successo: {percorso_completo}")
-
-def pulisci_schermo():
-    """
-    Pulisce la console dai messaggi precedenti.
-    Funziona sia su Windows ('cls') che su Linux/macOS ('clear').
-    """
-    os.system('cls' if os.name == 'nt' else 'clear')
-
 def menu_principale():
     """
-    Visualizza il menu principale del sistema.
+    Visualizza il menù principale chiedendo la scelta all'utente.
     
     Returns:
-        str: La scelta inserita dall'utente.
+        str: La stringa digitata dall'utente corrispondente all'opzione scelta.
     """
     print("\n----------------------------------")
     print("     SISTEMA SPESE PERSONALI      ")
@@ -90,17 +26,24 @@ def menu_principale():
     print("1. Gestione Categorie")
     print("2. Inserisci Spesa")
     print("3. Definisci Budget Mensile")
-    print("4. Visualizza Report (Console + PDF)")
+    print("4. Visualizza Report")
     print("5. Esci")
     print("----------------------------------")
     return input("Inserisci la tua scelta: ")
 
+# MODULO 1: Gestione Categorie
 def gestione_categorie(conn):
-    """Gestisce l'inserimento di una nuova categoria nel database."""
+    """
+    Gestisce l'inserimento di una nuova categoria di spesa.
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     nome = input("Nome della categoria: ").strip()
     if not nome:
         print("Errore: Il nome non può essere vuoto.")
         return
+    
     cursor = conn.cursor()
     try:
         cursor.execute("INSERT INTO Categorie (nome) VALUES (?)", (nome,))
@@ -109,8 +52,14 @@ def gestione_categorie(conn):
     except sqlite3.IntegrityError:
         print("Errore: La categoria esiste già.")
 
+# MODULO 2: Inserimento di una Spesa
 def inserisci_spesa(conn):
-    """Registra una nuova spesa collegandola a una categoria esistente."""
+    """
+    Acquisisce i dettagli di una spesa (data, importo, categoria, descrizione) e la registra nel DB.
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     data = input("Data (YYYY-MM-DD): ")
     try:
         importo = float(input("Importo: "))
@@ -120,176 +69,171 @@ def inserisci_spesa(conn):
     except ValueError:
         print("Errore: Inserire un numero valido.")
         return
+
     cat_nome = input("Nome categoria: ")
     desc = input("Descrizione (facoltativa): ")
+
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM Categorie WHERE nome = ?", (cat_nome,))
     res = cursor.fetchone()
+    
     if res:
-        cursor.execute("INSERT INTO Spese (data, importo, categoria_id, descrizione) VALUES (?, ?, ?, ?)", 
-                       (data, importo, res[0], desc))
-        conn.commit()
-        print("Spesa inserita correttamente.")
+        try:
+            cursor.execute("INSERT INTO Spese (data, importo, categoria_id, descrizione) VALUES (?, ?, ?, ?)", 
+                           (data, importo, res[0], desc))
+            conn.commit()
+            print("Spesa inserita correttamente.")
+        except sqlite3.Error as e:
+            print(f"Errore durante l'inserimento: {e}")
     else:
         print("Errore: la categoria non esiste.")
 
+# MODULO 3: Definizione del Budget Mensile
 def definisci_budget(conn):
-    """Imposta o aggiorna il budget mensile per una categoria specifica."""
+    """
+    Imposta il limite di spesa mensile per una categoria specifica. 
+    Se il budget esiste già, lo aggiorna (con ON CONFLICT).
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
     mese = input("Mese (YYYY-MM): ")
     nome_cat = input("Nome della categoria: ")
     try:
         importo = float(input("Importo del budget: "))
+        if importo <= 0:
+            print("Errore: il budget deve essere maggiore di zero.")
+            return
     except ValueError:
         print("Errore: Inserire un numero valido.")
         return
+
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM Categorie WHERE nome = ?", (nome_cat,))
     res = cursor.fetchone()
-    if res:
-        cursor.execute("""
-            INSERT INTO Budget (mese, categoria_id, importo_limite) VALUES (?, ?, ?)
-            ON CONFLICT(mese, categoria_id) DO UPDATE SET importo_limite=excluded.importo_limite
-        """, (mese, res[0], importo))
-        conn.commit()
-        print("Budget salvato correttamente.")
-    else:
-        print("Errore: categoria non trovata.")
 
+    if res:
+        try:
+            # Inserisce o aggiorna se esiste già un budget per quel mese/categoria
+            cursor.execute("""
+                INSERT INTO Budget (mese, categoria_id, importo_limite) VALUES (?, ?, ?)
+                ON CONFLICT(mese, categoria_id) DO UPDATE SET importo_limite=excluded.importo_limite
+            """, (mese, res[0], importo))
+            conn.commit()
+            print("Budget mensile salvato correttamente.")
+        except sqlite3.Error as e:
+            print(f"Errore database: {e}")
+    else:
+        print("Errore: la categoria non esiste.")
+
+# MODULO 4: Visualizzazione dei Report
 def visualizza_report(conn):
     """
-    Gestisce il sotto-menù della reportistica.
-    Visualizza i dati formattati in console e genera contemporaneamente i file PDF.
-    Resta all'interno di questo menù finché l'utente non sceglie di uscire.
-    """
-    while True:
-        print("\n--- MENU REPORT ---")
-        print("1. Totale spese per categoria (Console + PDF: report1.pdf)")
-        print("2. Spese mensili vs budget (Console + PDF: report2.pdf)")
-        print("3. Elenco completo spese (Console + PDF: report3.pdf)")
-        print("4. Ritorna al menu principale")
-        
-        scelta_rep = input("Inserisci scelta: ")
-        cursor = conn.cursor()
-
-        match scelta_rep:
-            case "1":
-                cursor.execute("""
-                    SELECT c.nome, SUM(s.importo) 
-                    FROM Spese s 
-                    JOIN Categorie c ON s.categoria_id = c.id 
-                    GROUP BY c.nome
-                """)
-                risultati = cursor.fetchall()
-                if risultati:
-                    print(f"\n{'CATEGORIA':<20} | {'TOTALE SPESO':<12}")
-                    print("-" * 35)
-                    for r in risultati:
-                        print(f"{r[0]:<20} | € {r[1]:>10.2f}")
-                    
-                    dati_pdf = [(r[0], f"{r[1]:.2f}") for r in risultati]
-                    genera_pdf("report1.pdf", "Totale Spese per Categoria", ["Categoria", "Totale (€)"], dati_pdf)
-                else:
-                    print("Nessun dato disponibile.")
-            
-            case "2":
-                mese = input("Inserisci mese (YYYY-MM): ")
-                cursor.execute("""
-                    SELECT c.nome, b.importo_limite, IFNULL(SUM(s.importo), 0)
-                    FROM Budget b 
-                    JOIN Categorie c ON b.categoria_id = c.id
-                    LEFT JOIN Spese s ON c.id = s.categoria_id AND strftime('%Y-%m', s.data) = b.mese
-                    WHERE b.mese = ? 
-                    GROUP BY c.nome
-                """, (mese,))
-                risultati = cursor.fetchall()
-                if risultati:
-                    print(f"\n{'CATEGORIA':<15} | {'BUDGET':<10} | {'SPESO':<10} | {'STATO'}")
-                    print("-" * 55)
-                    for r in risultati:
-                        stato = "OK" if r[2] <= r[1] else "!! OVER !!"
-                        print(f"{r[0]:<15} | € {r[1]:>8.2f} | € {r[2]:>8.2f} | {stato}")
-                    
-                    dati_pdf = [(r[0], f"{r[1]:.2f}", f"{r[2]:.2f}", "OK" if r[2] <= r[1] else "OVER") for r in risultati]
-                    genera_pdf("report2.pdf", f"Analisi Budget Mese: {mese}", ["Categoria", "Budget", "Speso", "Stato"], dati_pdf)
-                else:
-                    print(f"Nessun budget definito per il mese {mese}.")
-
-            case "3":
-                cursor.execute("""
-                    SELECT s.data, c.nome, s.importo, s.descrizione 
-                    FROM Spese s 
-                    JOIN Categorie c ON s.categoria_id = c.id 
-                    ORDER BY s.data ASC
-                """)
-                risultati = cursor.fetchall()
-                if risultati:
-                    print(f"\n{'DATA':<12} | {'CATEGORIA':<15} | {'IMPORTO':<10} | {'DESCRIZIONE'}")
-                    print("-" * 65)
-                    for r in risultati:
-                        desc = r[3] if r[3] else "-"
-                        print(f"{r[0]:<12} | {r[1]:<15} | € {r[2]:>8.2f} | {desc}")
-                    
-                    dati_pdf = [(r[0], r[1], f"{r[2]:.2f}", r[3]) for r in risultati]
-                    genera_pdf("report3.pdf", "Elenco Completo Spese", ["Data", "Categoria", "Importo", "Note"], dati_pdf)
-                else:
-                    print("Nessuna spesa registrata.")
-
-            case "4":
-                print("Ritorno al menù principale...")
-                break
-            
-            case _:
-                print("Attenzione!!!! scelta errata")
-
-def popola_dati_esempio(conn):
-    """Inserisce dati di test (Categorie, Budget e Spese) per la demo."""
-    cursor = conn.cursor()
-    mese_corrente = datetime.now().strftime('%Y-%m')
+    Gestisce il sottomenu dei report per visualizzare statistiche su spese e budget.
     
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
+    print("\n--- MENU REPORT ---")
+    print("1. Totale spese per categoria")
+    print("2. Spese mensili vs budget")
+    print("3. Elenco completo delle spese ordinate per data")
+    print("4. Ritorna al menu principale")
+    
+    scelta_rep = input("Inserisci scelta: ")
+    cursor = conn.cursor()
+
+    match scelta_rep:
+        case "1":
+            cursor.execute("""
+                SELECT c.nome, SUM(s.importo) FROM Spese s 
+                JOIN Categorie c ON s.categoria_id = c.id GROUP BY c.nome
+            """)
+            print("\nCategoria | Totale Speso")
+            for r in cursor.fetchall():
+                print(f"{r[0]} | {r[1]:.2f}")
+        
+        case "2":
+            mese = input("Inserisci mese (YYYY-MM): ")
+            cursor.execute("""
+                SELECT c.nome, b.importo_limite, IFNULL(SUM(s.importo), 0)
+                FROM Budget b
+                JOIN Categorie c ON b.categoria_id = c.id
+                LEFT JOIN Spese s ON c.id = s.categoria_id AND strftime('%Y-%m', s.data) = b.mese
+                WHERE b.mese = ?
+                GROUP BY c.nome
+            """, (mese,))
+            results = cursor.fetchall()
+            if not results:
+                print("Nessun budget definito per questo mese.")
+            else:
+                for r in results:
+                    stato = "OK" if r[2] <= r[1] else "SUPERAMENTO BUDGET"
+                    print(f"Mese: {mese}\nCategoria: {r[0]}\nBudget: {r[1]:.2f}\nSpeso: {r[2]:.2f}\nStato: {stato}\n")
+
+        case "3":
+            cursor.execute("""
+                SELECT s.data, c.nome, s.importo, s.descrizione 
+                FROM Spese s JOIN Categorie c ON s.categoria_id = c.id 
+                ORDER BY s.data ASC
+            """)
+            print("\nData | Categoria | Importo | Descrizione")
+            for r in cursor.fetchall():
+                print(f"{r[0]} | {r[1]} | {r[2]:.2f} | {r[3]}")
+        
+        case "4":
+            return
+        
+        case _:
+            print("Scelta non valida.")
+
+# FUNZIONE DI SUPPORTO: Dati di esempio per la dimostrazione
+def popola_dati_esempio(conn):
+    """
+    Inserisce dati fittizi nel database, per permettere una dimostrazione immediata dei report.
+    
+    Args:
+        conn (sqlite3.Connection): Connessione al database.
+    """
+    cursor = conn.cursor()
     # Inserimento Categorie
     categorie = [('Alimentari',), ('Trasporti',), ('Svago',)]
     cursor.executemany("INSERT OR IGNORE INTO Categorie (nome) VALUES (?)", categorie)
-    conn.commit()
-
-    # Recupero ID per associazioni
-    cursor.execute("SELECT id, nome FROM Categorie")
-    cat_dict = {nome: id for id, nome in cursor.fetchall()}
-
-    # Inserimento Budget per il mese corrente
-    budget_data = [
-        (mese_corrente, cat_dict['Alimentari'], 200.00),
-        (mese_corrente, cat_dict['Trasporti'], 50.00)
-    ]
-    cursor.executemany("""
-        INSERT OR IGNORE INTO Budget (mese, categoria_id, importo_limite) 
-        VALUES (?, ?, ?)""", budget_data)
-
-    # Inserimento Spese (una in budget, una che supera il budget)
-    spese_data = [
-        (datetime.now().strftime('%Y-%m-%d'), 150.00, cat_dict['Alimentari'], 'Spesa Settimanale'),
-        (datetime.now().strftime('%Y-%m-%d'), 75.00, cat_dict['Trasporti'], 'Rifornimento Benzina') # Supera i 50€
-    ]
-    cursor.executemany("""
-        INSERT OR IGNORE INTO Spese (data, importo, categoria_id, descrizione) 
-        VALUES (?, ?, ?, ?)""", spese_data)
     
+    # Inserimento Budget per dimostrare il confronto (Report 2)
+    budget = [('2025-01', 1, 300.00), ('2025-01', 2, 100.00)]
+    cursor.executemany("INSERT OR IGNORE INTO Budget (mese, categoria_id, importo_limite) VALUES (?, ?, ?)", budget)
+    
+    # Inserimento Spese per dimostrare i report
+    spese = [
+        ('2025-01-10', 50.50, 1, 'Spesa supermercato'),
+        ('2025-01-15', 270.00, 1, 'Cena ristorante'), # Supera budget Alimentari
+        ('2025-01-12', 20.00, 2, 'Benzina')
+    ]
+    cursor.executemany("INSERT OR IGNORE INTO Spese (data, importo, categoria_id, descrizione) VALUES (?, ?, ?, ?)", spese)
     conn.commit()
 
 def main():
-    """Punto di ingresso principale dell'applicazione."""
+    """
+    Entry point principale dell'applicazione. Inizializza il database,
+    carica i dati di test e avvia il ciclo interattivo del menu.
+    """
+    print("Avvio del Sistema Gestionale Spese...")
     conn = connect_db()
+    
+    # Inizializzazione Tabelle da file SQL
     try:
-        # Caricamento schema database da file esterno
         with open('sql/database.sql', 'r') as f:
             conn.executescript(f.read())
+        # Carica dati iniziali per la demo
         popola_dati_esempio(conn)
     except FileNotFoundError:
-        print("Errore fatale: File sql/database.sql non trovato.")
+        print("Errore: file sql/database.sql non trovato. Assicurarsi che la struttura delle cartelle sia corretta.")
         return
-    
+
     while True:
-        pulisci_schermo()
         scelta = menu_principale()
+        
         match scelta:
             case "1":
                 gestione_categorie(conn)
@@ -300,12 +244,11 @@ def main():
             case "4":
                 visualizza_report(conn)
             case "5":
-                print("Chiusura del sistema. Arrivederci!")
+                print("Chiusura del programma. Arrivederci!")
                 break
             case _:
-                print("Attenzione!!!! scelta errata")
-        if scelta != "5":
-            input("\nPremere Invio per continuare...")
+                print("Scelta non valida. Riprovare.")
+                
     conn.close()
 
 if __name__ == "__main__":
